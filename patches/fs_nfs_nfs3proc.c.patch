@@ -1,0 +1,51 @@
+--- linux-source.orig/fs/nfs/nfs3proc.c	2014-01-20 03:40:07.000000000 +0100
++++ linux-source/fs/nfs/nfs3proc.c	2014-08-22 03:08:18.681344577 +0200
+@@ -29,13 +29,45 @@
+ nfs3_rpc_wrapper(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
+ {
+ 	int res;
++	int retries = 0; /* used only for -EIO */
+ 	do {
+ 		res = rpc_call_sync(clnt, msg, flags);
+-		if (res != -EJUKEBOX)
++		if (res == -EIO || retries > 0)
++		  printk(KERN_INFO "%s: (proc %d %s) call retry #%d res == %d\n", __func__,
++			 msg->rpc_proc->p_proc, msg->rpc_proc->p_name,
++			 retries, res);
++		if (res == -EIO && retries <= 4)
++		  {
++		    int retry_jiffies;
++		    switch (++retries)
++		      {
++		      case 1:
++			retry_jiffies = 20 * HZ / 1000;
+ 			break;
+-		freezable_schedule_timeout_killable_unsafe(NFS_JUKEBOX_RETRY_TIME);
+-		res = -ERESTARTSYS;
++		      case 2:
++			retry_jiffies = 100 * HZ / 1000;
++			break;
++		      case 3:
++			retry_jiffies = 1 * HZ;
++			break;
++		      default:
++			retry_jiffies = 5 * HZ;
++		      }
++		    freezable_schedule_timeout_killable_unsafe(retry_jiffies);
++		    res = -ERESTARTSYS;
++		  }
++		else if (res == -EJUKEBOX)
++		  {
++		    freezable_schedule_timeout_killable_unsafe(NFS_JUKEBOX_RETRY_TIME);
++		    res = -ERESTARTSYS;
++		  }
++		else
++		  break;
+ 	} while (!fatal_signal_pending(current));
++	if (res == -EIO || retries > 0)
++	  printk(KERN_INFO "%s: (proc %d %s) return retry #%d res == %d\n", __func__,
++		 msg->rpc_proc->p_proc, msg->rpc_proc->p_name,
++		 retries, res);
+ 	return res;
+ }
+ 
