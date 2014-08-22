@@ -1,5 +1,5 @@
 --- linux-source.orig/fs/nfs/nfs3proc.c	2014-01-20 03:40:07.000000000 +0100
-+++ linux-source/fs/nfs/nfs3proc.c	2014-08-22 03:08:18.681344577 +0200
++++ linux-source/fs/nfs/nfs3proc.c	2014-08-22 18:12:05.127005305 +0200
 @@ -29,13 +29,45 @@
  nfs3_rpc_wrapper(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
  {
@@ -49,3 +49,82 @@
  	return res;
  }
  
+@@ -55,6 +87,17 @@
+ }
+ 
+ static int
++nfs3_async_handle_eio(struct rpc_task *task, struct inode *inode)
++{
++	if (task->tk_status != -EIO)
++		return 0;
++	task->tk_status = 0;
++	rpc_restart_call(task);
++	rpc_delay(task, 100 * HZ / 1000);
++	return 1;
++}
++
++static int
+ do_proc_get_root(struct rpc_clnt *client, struct nfs_fh *fhandle,
+ 		 struct nfs_fsinfo *info)
+ {
+@@ -439,6 +482,12 @@
+ 	struct nfs_removeres *res;
+ 	if (nfs3_async_handle_jukebox(task, dir))
+ 		return 0;
++	if (task->tk_status == -EIO)
++	  printk(KERN_INFO "%s: (proc %d %s) async done EIO\n", __func__,
++		 task->tk_msg.rpc_proc->p_proc, task->tk_msg.rpc_proc->p_name);
++	if (nfs3_async_handle_eio(task, dir))
++		return 0;
++
+ 	res = task->tk_msg.rpc_resp;
+ 	nfs_post_op_update_inode(dir, res->dir_attr);
+ 	return 1;
+@@ -463,6 +512,11 @@
+ 
+ 	if (nfs3_async_handle_jukebox(task, old_dir))
+ 		return 0;
++	if (task->tk_status == -EIO)
++	  printk(KERN_INFO "%s: (proc %d %s) async done EIO\n", __func__,
++		 task->tk_msg.rpc_proc->p_proc, task->tk_msg.rpc_proc->p_name);
++	if (nfs3_async_handle_eio(task, old_dir))
++		return 0;
+ 	res = task->tk_msg.rpc_resp;
+ 
+ 	nfs_post_op_update_inode(old_dir, res->old_fattr);
+@@ -815,6 +869,11 @@
+ 
+ 	if (nfs3_async_handle_jukebox(task, inode))
+ 		return -EAGAIN;
++	if (task->tk_status == -EIO)
++	  printk(KERN_INFO "%s: (proc %d %s) async done EIO\n", __func__,
++		 task->tk_msg.rpc_proc->p_proc, task->tk_msg.rpc_proc->p_name);
++	if (nfs3_async_handle_eio(task, inode))
++		return -EAGAIN;
+ 
+ 	nfs_invalidate_atime(inode);
+ 	nfs_refresh_inode(inode, &data->fattr);
+@@ -838,6 +897,11 @@
+ 
+ 	if (nfs3_async_handle_jukebox(task, inode))
+ 		return -EAGAIN;
++	if (task->tk_status == -EIO)
++	  printk(KERN_INFO "%s: (proc %d %s) async done EIO\n", __func__,
++		 task->tk_msg.rpc_proc->p_proc, task->tk_msg.rpc_proc->p_name);
++	if (nfs3_async_handle_eio(task, inode))
++		return -EAGAIN;
+ 	if (task->tk_status >= 0)
+ 		nfs_post_op_update_inode_force_wcc(inode, data->res.fattr);
+ 	return 0;
+@@ -863,6 +927,11 @@
+ {
+ 	if (nfs3_async_handle_jukebox(task, data->inode))
+ 		return -EAGAIN;
++	if (task->tk_status == -EIO)
++	  printk(KERN_INFO "%s: (proc %d %s) async done EIO\n", __func__,
++		 task->tk_msg.rpc_proc->p_proc, task->tk_msg.rpc_proc->p_name);
++	if (nfs3_async_handle_eio(task, data->inode))
++		return -EAGAIN;
+ 	nfs_refresh_inode(data->inode, data->res.fattr);
+ 	return 0;
+ }
