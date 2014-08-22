@@ -15,8 +15,13 @@ fi
 
 if ! test -e "$fix_dir/$linux_source_version/fs/nfs"; then
   tar -vjxf /usr/src/$linux_source_version.tar.bz2 -C "$fix_dir/" $linux_source_version/fs/nfs/
+  cp -a "$fix_dir/$linux_source_version/" "$fix_dir/$linux_source_version.orig/"
 fi
 
 if ! test -e "$fix_dir/linux-source"; then
   ln -s $linux_source_version "$fix_dir/linux-source"
+fi
+
+if ! test -e "$fix_dir/linux-source.orig"; then
+  ln -s $linux_source_version.orig "$fix_dir/linux-source.orig"
 fi
