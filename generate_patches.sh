@@ -2,7 +2,7 @@
 
 cd "$(dirname $0)"
 
-files="$(diff -ru linux-source.orig/ linux-source/ | grep "^diff .*\.[ch]$" | awk '{print $3}' | cut -d/ -f2-)"
+files="$(diff -ru linux-source.orig/ linux-source/ | grep "^diff .*\.[ch]$" | grep -v "\.mod.c$" | awk '{print $3}' | cut -d/ -f2-)"
 
 for file in $files; do
   file_=$(echo "$file" | tr / _)
