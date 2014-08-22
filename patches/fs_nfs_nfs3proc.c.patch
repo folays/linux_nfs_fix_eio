@@ -1,5 +1,5 @@
 --- linux-source.orig/fs/nfs/nfs3proc.c	2014-01-20 03:40:07.000000000 +0100
-+++ linux-source/fs/nfs/nfs3proc.c	2014-08-22 18:12:05.127005305 +0200
++++ linux-source/fs/nfs/nfs3proc.c	2014-08-22 20:23:17.289579790 +0200
 @@ -29,13 +29,45 @@
  nfs3_rpc_wrapper(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
  {
@@ -49,14 +49,39 @@
  	return res;
  }
  
-@@ -55,6 +87,17 @@
+@@ -55,6 +87,42 @@
  }
  
  static int
 +nfs3_async_handle_eio(struct rpc_task *task, struct inode *inode)
 +{
++	struct dentry *dentry;
++	char *name = NULL;
++	char *path = NULL;
++
 +	if (task->tk_status != -EIO)
 +		return 0;
++
++	dentry = d_find_alias(inode);
++
++	name = __getname();
++	if (name)
++	  {
++	    path = dentry_path_raw(dentry, name, PATH_MAX);
++	    if (IS_ERR(path))
++	      path = NULL;
++	  }
++
++	printk(KERN_INFO "%s : (proc %d %s) async done EIO dentry %pd | %s\n", __func__,
++	       task->tk_msg.rpc_proc->p_proc, task->tk_msg.rpc_proc->p_name, dentry,
++	       path);
++
++	if (name)
++	  __putname(name);
++
++	if (dentry)
++	  dput(dentry);
++
 +	task->tk_status = 0;
 +	rpc_restart_call(task);
 +	rpc_delay(task, 100 * HZ / 1000);
@@ -67,7 +92,7 @@
  do_proc_get_root(struct rpc_clnt *client, struct nfs_fh *fhandle,
  		 struct nfs_fsinfo *info)
  {
-@@ -439,6 +482,12 @@
+@@ -439,6 +507,12 @@
  	struct nfs_removeres *res;
  	if (nfs3_async_handle_jukebox(task, dir))
  		return 0;
@@ -80,7 +105,7 @@
  	res = task->tk_msg.rpc_resp;
  	nfs_post_op_update_inode(dir, res->dir_attr);
  	return 1;
-@@ -463,6 +512,11 @@
+@@ -463,6 +537,11 @@
  
  	if (nfs3_async_handle_jukebox(task, old_dir))
  		return 0;
@@ -92,7 +117,7 @@
  	res = task->tk_msg.rpc_resp;
  
  	nfs_post_op_update_inode(old_dir, res->old_fattr);
-@@ -815,6 +869,11 @@
+@@ -815,6 +894,11 @@
  
  	if (nfs3_async_handle_jukebox(task, inode))
  		return -EAGAIN;
@@ -104,7 +129,7 @@
  
  	nfs_invalidate_atime(inode);
  	nfs_refresh_inode(inode, &data->fattr);
-@@ -838,6 +897,11 @@
+@@ -838,6 +922,11 @@
  
  	if (nfs3_async_handle_jukebox(task, inode))
  		return -EAGAIN;
@@ -116,7 +141,7 @@
  	if (task->tk_status >= 0)
  		nfs_post_op_update_inode_force_wcc(inode, data->res.fattr);
  	return 0;
-@@ -863,6 +927,11 @@
+@@ -863,6 +952,11 @@
  {
  	if (nfs3_async_handle_jukebox(task, data->inode))
  		return -EAGAIN;
